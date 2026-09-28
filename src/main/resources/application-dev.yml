@@ -1,0 +1,82 @@
+spring:
+  application:
+    name: notification-service
+  cloud:
+    aws:
+      region:
+        static: ap-south-1
+      credentials:
+            access-key: ${AWS_ACCESS_KEY_ID}
+            secret-key: ${AWS_SECRET_ACCESS_KEY}
+  datasource:
+    url: jdbc:postgresql://stornuage-postgres.cxeaa4wyq1ef.ap-south-1.rds.amazonaws.com:5432/stornuage?currentSchema=nutritionmeter
+    username: postgres
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 20000
+      idle-timeout: 300000
+      leak-detection-threshold: 60000
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: nutritionmeter
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: false
+
+server:
+  port: 8080
+  shutdown: graceful
+
+aws:
+  region: ap-south-1
+  sqs:
+    alert-signals-queue: https://sqs.ap-south-1.amazonaws.com/020194054282/stornuage-alert-signals.fifo
+    alert-signals-dlq: https://sqs.ap-south-1.amazonaws.com/020194054282/stornuage-alert-signals-dlq.fifo
+
+notification:
+  firebase:
+    # path loaded from secrets manager at runtime
+    credentials-path: src/test/java/local-fcm-credentials.json
+    #credentials-secret-name: ${FCM_CREDENTIALS_SECRET:stornuage/fcm-service-account}
+  cooldown:
+    same-severity-hours: 24
+  escalation:
+    # stop re-firing after this many re-sends
+    max-level: 3
+  signal:
+    # reject signals older than this (stale signal protection)
+    max-age-minutes: 10
+  fcm:
+    # retries on transient FCM failures
+    max-retries: 3
+    retry-backoff-ms: 500
+
+auth:
+  thingsboard:
+    base-url: http://65.1.213.113:8080
+    jwt-signing-key: ${THINGSBOARD_JWT_SIGNING_KEY}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: notification-service
+
+logging:
+  level:
+    root: INFO
+    com.stornuage.notification: DEBUG
+    io.awspring.cloud.sqs: INFO

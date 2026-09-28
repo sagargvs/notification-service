@@ -1,0 +1,53 @@
+{
+  "family": "notification-service-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/notification-service-task-role",
+  "containerDefinitions": [
+    {
+      "name": "notification-service-container",
+      "image": "ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/notification-service:latest",
+      "essential": true,
+      "portMappings": [
+        { "containerPort": 8080, "protocol": "tcp" }
+      ],
+      "dockerLabels": {
+        "traefik.enable": "true",
+        "traefik.http.routers.notification.rule": "Host(`api.stornuage.com`) && PathPrefix(`/notificationService`)",
+        "traefik.http.routers.notification.entrypoints": "websecure",
+        "traefik.http.routers.notification.tls": "true",
+        "traefik.http.routers.notification.tls.certresolver": "letsencrypt",
+        "traefik.http.middlewares.strip-notification.stripprefix.prefixes": "/notificationService",
+        "traefik.http.routers.notification.middlewares": "strip-notification",
+        "traefik.http.services.notification.loadbalancer.server.port": "8080",
+        "promtail.scrape": "true",
+        "promtail.job": "notification-service",
+        "promtail.team": "backend"
+      },
+      "environment": [
+        { "name": "AWS_REGION",                  "value": "ap-south-1" },
+        { "name": "SPRING_PROFILES_ACTIVE",      "value": "prod" },
+        { "name": "SQS_ALERT_SIGNALS_QUEUE",     "value": "stornuage-alert-signals.fifo" },
+        { "name": "SQS_ALERT_SIGNALS_DLQ",       "value": "stornuage-alert-signals-dlq" },
+        { "name": "FCM_CREDENTIALS_SECRET",      "value": "stornuage/fcm-service-account" },
+        { "name": "DB_URL",                      "value": "jdbc:postgresql://stornuage-rds.cluster-xxx.ap-south-1.rds.amazonaws.com:5432/stornuage" },
+        { "name": "TB_BASE_URL",                 "value": "http://thingsboard:8080" }
+      ],
+      "secrets": [
+        { "name": "DB_USER",              "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:stornuage/rds-credentials:username::" },
+        { "name": "DB_PASSWORD",          "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:stornuage/rds-credentials:password::" },
+        { "name": "TB_JWT_SIGNING_KEY",   "valueFrom": "arn:aws:secretsmanager:ap-south-1:ACCOUNT_ID:secret:stornuage/tb-jwt-signing-key" }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -q -O - http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}

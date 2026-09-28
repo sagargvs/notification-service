@@ -1,0 +1,87 @@
+spring:
+  application:
+    name: notification-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/stornuage}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 20000
+      idle-timeout: 300000
+      leak-detection-threshold: 60000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
+        default_schema: stornuage_notifications
+  flyway:
+    enabled: true
+    schemas: stornuage_notifications
+    default-schema: stornuage_notifications
+    create-schemas: true
+    baseline-on-migrate: true
+
+server:
+  port: 8080
+  shutdown: graceful
+  servlet:
+    context-path: /notification
+
+aws:
+  region: ${AWS_REGION:ap-south-1}
+  sqs:
+    alert-signals-queue: ${SQS_ALERT_SIGNALS_QUEUE:stornuage-alert-signals.fifo}
+    alert-signals-dlq: ${SQS_ALERT_SIGNALS_DLQ:stornuage-alert-signals-dlq}
+
+notification:
+  firebase:
+    credentials-json: ${FCM_CREDENTIALS_JSON:}
+    credentials-secret-name: ${FCM_CREDENTIALS_SECRET:stornuage/fcm-service-account}
+  cooldown:
+    # no re-fire of same alert within this window unless severity upgrades
+    same-severity-hours: 24
+  escalation:
+    # stop re-firing after this many re-sends
+    max-level: 3
+  signal:
+    # reject signals older than this (stale signal protection)
+    max-age-minutes: 10
+  fcm:
+    # retries on transient FCM failures
+    max-retries: 3
+    retry-backoff-ms: 500
+  coalescing:
+    window-seconds: 90
+    max-items-in-body: 3
+
+auth:
+  # JWT verification from ThingsBoard — populated via config
+  thingsboard:
+    base-url: ${TB_BASE_URL:http://thingsboard:8080}
+    jwt-signing-key: ${TB_JWT_SIGNING_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: notification-service
+
+logging:
+  level:
+    root: INFO
+    com.stornuage.notification: DEBUG
+    io.awspring.cloud.sqs: INFO
